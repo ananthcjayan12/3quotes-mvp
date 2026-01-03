@@ -3,14 +3,19 @@
 import { getOpenAIClient, NextStepSchema, type NextStep } from "@/lib/openai";
 import { zodResponseFormat } from "openai/helpers/zod";
 
-const MAX_QUESTIONS = 10;
+const MAX_QUESTIONS = 5;
 
-// Generate a quote based on collected info
+// Response type that includes error state
+export type StepResponse =
+    | { success: true; data: NextStep }
+    | { success: false; error: "NO_API_KEY" | "API_ERROR" };
+
+// Generate a quote based on collected info (AED currency)
 function generateQuote(history: { question: string; answer: string }[], category: string): NextStep {
     const projectName = category.charAt(0).toUpperCase() + category.slice(1) + " Project";
 
     // Extract budget from history if available
-    const budgetAnswer = history.find(h => h.question.toLowerCase().includes("budget"))?.answer || "$5,000 - $10,000";
+    const budgetAnswer = history.find(h => h.question.toLowerCase().includes("budget"))?.answer || "AED 18,000 - AED 37,000";
 
     return {
         type: "quote",
@@ -20,12 +25,12 @@ function generateQuote(history: { question: string; answer: string }[], category
             client_name: "John Doe",
             date: new Date().toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" }),
             items: [
-                { name: "Consultation & Planning", qty: "1", price: "$500", total: "$500" },
-                { name: "Materials & Equipment", qty: "1", price: "$1,500", total: "$1,500" },
-                { name: "Labor (estimated)", qty: "8 hours", price: "$75/hr", total: "$600" },
-                { name: "Project Management", qty: "1", price: "$400", total: "$400" },
+                { name: "Consultation & Planning", qty: "1", price: "AED 1,800", total: "AED 1,800" },
+                { name: "Materials & Equipment", qty: "1", price: "AED 5,500", total: "AED 5,500" },
+                { name: "Labor (estimated)", qty: "8 hours", price: "AED 275/hr", total: "AED 2,200" },
+                { name: "Project Management", qty: "1", price: "AED 1,500", total: "AED 1,500" },
             ],
-            total_cost: "$3,000",
+            total_cost: "AED 11,000",
         },
     };
 }
@@ -56,7 +61,7 @@ function getFallbackStep(history: { question: string; answer: string }[], catego
             question: {
                 text: "What is your approximate budget range?",
                 inputType: "select",
-                options: ["Under $1,000", "$1,000 - $5,000", "$5,000 - $10,000", "Over $10,000"],
+                options: ["Under AED 3,700", "AED 3,700 - AED 18,000", "AED 18,000 - AED 37,000", "Over AED 37,000"],
             },
             quote: null,
         };
@@ -76,17 +81,21 @@ function getFallbackStep(history: { question: string; answer: string }[], catego
     return generateQuote(history, category);
 }
 
-export async function getNextStep(history: { question: string; answer: string }[], category: string): Promise<NextStep> {
-    const client = getOpenAIClient();
+export async function getNextStep(
+    history: { question: string; answer: string }[],
+    category: string,
+    apiKey?: string
+): Promise<StepResponse> {
+    const client = getOpenAIClient(apiKey);
+
+    // If no client (missing API key), return error
+    if (!client) {
+        return { success: false, error: "NO_API_KEY" };
+    }
 
     // Force quote generation after max questions
     if (history.length >= MAX_QUESTIONS) {
-        return generateQuote(history, category);
-    }
-
-    // If no client (missing API key), use fallback logic
-    if (!client) {
-        return getFallbackStep(history, category);
+        return { success: true, data: generateQuote(history, category) };
     }
 
     // OpenAI Model: gpt-4o-2024-08-06 (supports structured outputs)
@@ -106,6 +115,7 @@ export async function getNextStep(history: { question: string; answer: string }[
     ${JSON.stringify(history, null, 2)}
     
     CRITICAL RULES FOR GENERATING QUOTES:
+    - ALL PRICES MUST BE IN AED (United Arab Emirates Dirham) currency.
     - The quote MUST be based on the user's specific answers from the conversation history.
     - Extract project details from the user's answers and create LINE ITEMS that match what they described.
     - For example, if user said "kitchen remodel with granite countertops", include line items for:
@@ -115,7 +125,7 @@ export async function getNextStep(history: { question: string; answer: string }[
     - If user mentioned a budget, ensure total stays within that range.
     - If user mentioned timeline urgency, you may add rush fees if applicable.
     - The 'project_name' should reflect what the user actually described, not just the category.
-    - Use realistic market prices for your region.
+    - Use realistic market prices in AED for the UAE region.
     - Include 3-5 relevant line items based on the conversation.
     
     Rules for Questions:
@@ -149,10 +159,10 @@ export async function getNextStep(history: { question: string; answer: string }[
         // Parse and validate the JSON response with Zod
         const result = NextStepSchema.parse(JSON.parse(content));
 
-        return result;
+        return { success: true, data: result };
     } catch (error) {
         console.error("OpenAI Error:", error);
-        // Fallback in case of error (safety net)
-        return getFallbackStep(history, category);
+        // Return API error
+        return { success: false, error: "API_ERROR" };
     }
 }

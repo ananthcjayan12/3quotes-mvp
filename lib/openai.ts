@@ -1,20 +1,18 @@
 import OpenAI from "openai";
 import { z } from "zod";
 
-// Lazy initialization to avoid crashing if API key is missing at startup
-let openaiClient: OpenAI | null = null;
+// Create OpenAI client with provided API key or fallback to env variable
+export function getOpenAIClient(apiKey?: string): OpenAI | null {
+    const key = apiKey || process.env.OPENAI_API_KEY;
 
-export function getOpenAIClient(): OpenAI | null {
-    if (!process.env.OPENAI_API_KEY) {
-        console.warn("OPENAI_API_KEY is not set. AI features will use fallback.");
+    if (!key) {
+        console.warn("OPENAI_API_KEY is not set. AI features will not work.");
         return null;
     }
-    if (!openaiClient) {
-        openaiClient = new OpenAI({
-            apiKey: process.env.OPENAI_API_KEY,
-        });
-    }
-    return openaiClient;
+
+    return new OpenAI({
+        apiKey: key,
+    });
 }
 
 // Schema for the quote line items

@@ -5,17 +5,29 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import type { QuoteSchema } from "@/lib/openai";
-import { z } from "zod";
+import { Settings, Download, CheckCircle2, ArrowLeft, FileText, Calendar, User, Briefcase } from "lucide-react";
+import { jsPDF } from "jspdf";
 
-// We need to redefine schema inference here or import shared type
-// For simplicity in this file, we'll assume the structure matches
+interface QuoteItem {
+    name: string;
+    qty: string;
+    price: string;
+    total: string;
+}
+
+interface Quote {
+    project_name: string;
+    client_name: string;
+    date: string;
+    items: QuoteItem[];
+    total_cost: string;
+}
 
 function EstimateContent() {
     const searchParams = useSearchParams();
     const dataString = searchParams.get("data");
 
-    let quote = null;
+    let quote: Quote | null = null;
     if (dataString) {
         try {
             quote = JSON.parse(decodeURIComponent(dataString));
@@ -24,89 +36,276 @@ function EstimateContent() {
         }
     }
 
-    // Fallback demo data if no dynamic data (or error)
+    // Fallback demo data
     const items = quote?.items || [
-        { name: "Flooring Installation", qty: "500 sq ft", price: "$5.00", total: "$2,500" },
-        { name: "Painting", qty: "3 Rooms", price: "$400", total: "$1,200" },
+        { name: "Flooring Installation", qty: "500 sq ft", price: "AED 18.50", total: "AED 9,250" },
+        { name: "Painting", qty: "3 Rooms", price: "AED 1,500", total: "AED 4,500" },
     ];
 
-    const totalCost = quote?.total_cost || "$3,700";
+    const totalCost = quote?.total_cost || "AED 13,750";
     const projectName = quote?.project_name || "Home Renovation";
     const clientName = quote?.client_name || "John Doe";
-    const date = quote?.date || "Dec 16, 2025";
+    const date = quote?.date || new Date().toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
+
+    const generatePDF = () => {
+        const doc = new jsPDF();
+
+        // Header with brand
+        doc.setFillColor(37, 99, 235);
+        doc.rect(0, 0, 210, 35, "F");
+
+        doc.setFontSize(24);
+        doc.setTextColor(255, 255, 255);
+        doc.text("3Quotes", 20, 23);
+
+        doc.setFontSize(12);
+        doc.text("Project Estimate", 160, 23);
+
+        // Quote badge
+        doc.setFillColor(239, 246, 255);
+        doc.roundedRect(20, 45, 170, 30, 3, 3, "F");
+
+        doc.setTextColor(37, 99, 235);
+        doc.setFontSize(10);
+        doc.text("ESTIMATE PREPARED FOR", 30, 55);
+
+        doc.setTextColor(15, 23, 42);
+        doc.setFontSize(14);
+        doc.setFont("helvetica", "bold");
+        doc.text(projectName, 30, 66);
+
+        // Summary section
+        doc.setFontSize(11);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(100, 116, 139);
+        doc.text("SUMMARY", 20, 95);
+
+        doc.setDrawColor(226, 232, 240);
+        doc.line(20, 98, 190, 98);
+
+        // Info grid
+        const infoY = 110;
+        doc.setFontSize(9);
+        doc.setTextColor(100, 116, 139);
+        doc.setFont("helvetica", "normal");
+
+        doc.text("PROJECT", 20, infoY);
+        doc.text("CLIENT", 80, infoY);
+        doc.text("DATE", 140, infoY);
+
+        doc.setFontSize(11);
+        doc.setTextColor(15, 23, 42);
+        doc.setFont("helvetica", "bold");
+        doc.text(projectName, 20, infoY + 8);
+        doc.text(clientName, 80, infoY + 8);
+        doc.text(date, 140, infoY + 8);
+
+        // Table
+        const tableTop = 140;
+
+        // Table header
+        doc.setFillColor(248, 250, 252);
+        doc.rect(20, tableTop - 8, 170, 12, "F");
+
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(9);
+        doc.setTextColor(71, 85, 105);
+        doc.text("ITEM", 25, tableTop);
+        doc.text("QTY", 100, tableTop);
+        doc.text("UNIT PRICE", 125, tableTop);
+        doc.text("TOTAL", 165, tableTop);
+
+        // Table rows
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(30, 41, 59);
+        let yPos = tableTop + 15;
+
+        items.forEach((item: QuoteItem, index: number) => {
+            if (index % 2 === 1) {
+                doc.setFillColor(248, 250, 252);
+                doc.rect(20, yPos - 6, 170, 12, "F");
+            }
+            doc.setFontSize(10);
+            doc.text(item.name, 25, yPos);
+            doc.text(item.qty, 100, yPos);
+            doc.text(item.price, 125, yPos);
+            doc.setFont("helvetica", "bold");
+            doc.text(item.total, 165, yPos);
+            doc.setFont("helvetica", "normal");
+            yPos += 14;
+        });
+
+        // Total section
+        yPos += 10;
+        doc.setDrawColor(226, 232, 240);
+        doc.line(20, yPos - 5, 190, yPos - 5);
+
+        doc.setFillColor(239, 246, 255);
+        doc.roundedRect(110, yPos, 80, 20, 3, 3, "F");
+
+        doc.setFontSize(10);
+        doc.setTextColor(37, 99, 235);
+        doc.setFont("helvetica", "bold");
+        doc.text("TOTAL ESTIMATED COST", 118, yPos + 8);
+
+        doc.setFontSize(14);
+        doc.setTextColor(15, 23, 42);
+        doc.text(totalCost, 118, yPos + 16);
+
+        // Footer
+        doc.setFontSize(8);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(148, 163, 184);
+        doc.text("Generated by 3Quotes - AI-Powered Service Estimates", 20, 280);
+        doc.text(`Created: ${new Date().toLocaleString()}`, 145, 280);
+
+        // Save
+        doc.save(`3Quotes_${projectName.replace(/\s+/g, '_')}_Estimate.pdf`);
+    };
 
     return (
-        <div className="min-h-screen bg-slate-50 flex flex-col font-sans">
-            <header className="flex items-center justify-between px-8 py-6 max-w-7xl mx-auto w-full">
-                <Link href="/" className="text-2xl font-bold text-slate-900">3Quotes</Link>
-                <Link href="/">
-                    <Button variant="ghost" className="text-slate-600">
-                        Sign In
-                    </Button>
-                </Link>
+        <div className="min-h-screen bg-gradient-subtle flex flex-col font-sans">
+            {/* Header */}
+            <header className="sticky top-0 z-50 glass border-b border-slate-200/50">
+                <div className="flex items-center justify-between px-6 md:px-8 py-4 max-w-7xl mx-auto w-full">
+                    <Link href="/" className="flex items-center gap-3 group">
+                        <ArrowLeft className="w-5 h-5 text-slate-400 group-hover:text-slate-600 transition-colors" />
+                        <div className="flex items-center gap-2">
+                            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-600 to-blue-700 flex items-center justify-center">
+                                <span className="text-white font-bold text-sm">3Q</span>
+                            </div>
+                            <span className="text-xl font-bold text-slate-900">3Quotes</span>
+                        </div>
+                    </Link>
+                    <Link href="/settings">
+                        <Button variant="ghost" size="icon" className="text-slate-600 hover:text-slate-900 hover:bg-slate-100">
+                            <Settings className="w-5 h-5" />
+                        </Button>
+                    </Link>
+                </div>
             </header>
 
-            <div className="flex-1 flex items-center justify-center p-4">
-                <Card className="w-full max-w-2xl px-12 py-10 shadow-xl border-0 bg-white">
-                    <div className="flex justify-between items-start mb-8">
-                        <div className="text-3xl font-bold text-blue-900">3Quotes</div>
-                        <div className="text-xl font-bold text-slate-900">Project Estimate</div>
-                    </div>
-
-                    <div className="mb-8">
-                        <h3 className="font-bold text-slate-900 mb-4">Summary</h3>
-                        <div className="grid grid-cols-3 gap-8 text-sm">
-                            <div>
-                                <div className="font-bold text-slate-900">Project</div>
-                                <div className="text-slate-600 mt-1">{projectName}</div>
-                            </div>
-                            <div>
-                                <div className="font-bold text-slate-900">Client</div>
-                                <div className="text-slate-600 mt-1">{clientName}</div>
-                            </div>
-                            <div className="text-right">
-                                <div className="font-bold text-slate-900">Date</div>
-                                <div className="text-slate-600 mt-1">{date}</div>
-                            </div>
+            <div className="flex-1 flex items-center justify-center p-4 md:p-8">
+                <div className="w-full max-w-3xl animate-fade-in">
+                    {/* Success Banner */}
+                    <div className="flex items-center justify-center gap-3 mb-6 p-4 rounded-xl bg-green-50 border border-green-200">
+                        <CheckCircle2 className="w-6 h-6 text-green-600" />
+                        <div>
+                            <span className="font-semibold text-green-800">Quote Generated Successfully!</span>
+                            <span className="text-green-600 text-sm ml-2">Review your estimate below</span>
                         </div>
                     </div>
 
-                    <div className="border rounded-lg overflow-hidden mb-8">
-                        <table className="w-full text-left text-sm">
-                            <thead className="bg-slate-100 text-slate-900 font-bold">
-                                <tr>
-                                    <th className="p-3">Item</th>
-                                    <th className="p-3">Qty</th>
-                                    <th className="p-3">Unit Price</th>
-                                    <th className="p-3">Total</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-100">
-                                {items.map((item: any, index: number) => (
-                                    <tr key={index} className="text-slate-700">
-                                        <td className="p-3 font-medium">{item.name}</td>
-                                        <td className="p-3">{item.qty}</td>
-                                        <td className="p-3">{item.price}</td>
-                                        <td className="p-3">{item.total}</td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-
-                    <div className="flex justify-end mb-8">
-                        <div className="text-right">
-                            <span className="font-bold text-slate-900 mr-2">Total Estimated Cost:</span>
-                            <span className="font-bold text-slate-900 text-lg">{totalCost}</span>
+                    <Card className="overflow-hidden shadow-2xl border-0 bg-white">
+                        {/* Quote Header */}
+                        <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-8 py-6 text-white">
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center">
+                                        <FileText className="w-6 h-6" />
+                                    </div>
+                                    <div>
+                                        <h1 className="text-2xl font-bold">Project Estimate</h1>
+                                        <p className="text-blue-100 text-sm">Prepared by 3Quotes AI</p>
+                                    </div>
+                                </div>
+                                <div className="text-right">
+                                    <div className="text-3xl font-bold">{totalCost}</div>
+                                    <div className="text-blue-100 text-sm">Total Estimate</div>
+                                </div>
+                            </div>
                         </div>
-                    </div>
 
-                    <a href="/sample_quote.pdf" download="3Quotes_Estimate.pdf" className="w-full block">
-                        <Button className="w-full h-12 text-md font-semibold bg-blue-700 hover:bg-blue-800">
-                            Download PDF
-                        </Button>
-                    </a>
-                </Card>
+                        {/* Quote Body */}
+                        <div className="p-8">
+                            {/* Summary Cards */}
+                            <div className="grid grid-cols-3 gap-4 mb-8">
+                                <div className="p-4 rounded-xl bg-slate-50 border border-slate-100">
+                                    <div className="flex items-center gap-2 text-slate-500 text-sm mb-1">
+                                        <Briefcase className="w-4 h-4" />
+                                        <span>Project</span>
+                                    </div>
+                                    <div className="font-semibold text-slate-900">{projectName}</div>
+                                </div>
+                                <div className="p-4 rounded-xl bg-slate-50 border border-slate-100">
+                                    <div className="flex items-center gap-2 text-slate-500 text-sm mb-1">
+                                        <User className="w-4 h-4" />
+                                        <span>Client</span>
+                                    </div>
+                                    <div className="font-semibold text-slate-900">{clientName}</div>
+                                </div>
+                                <div className="p-4 rounded-xl bg-slate-50 border border-slate-100">
+                                    <div className="flex items-center gap-2 text-slate-500 text-sm mb-1">
+                                        <Calendar className="w-4 h-4" />
+                                        <span>Date</span>
+                                    </div>
+                                    <div className="font-semibold text-slate-900">{date}</div>
+                                </div>
+                            </div>
+
+                            {/* Items Table */}
+                            <div className="mb-8">
+                                <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-4">
+                                    Breakdown
+                                </h3>
+                                <div className="border border-slate-200 rounded-xl overflow-hidden">
+                                    <table className="w-full text-left">
+                                        <thead className="bg-slate-50 border-b border-slate-200">
+                                            <tr>
+                                                <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase">Item</th>
+                                                <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase">Qty</th>
+                                                <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase">Unit Price</th>
+                                                <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase text-right">Total</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-100">
+                                            {items.map((item: QuoteItem, index: number) => (
+                                                <tr key={index} className="hover:bg-slate-50 transition-colors">
+                                                    <td className="px-4 py-4 font-medium text-slate-900">{item.name}</td>
+                                                    <td className="px-4 py-4 text-slate-600">{item.qty}</td>
+                                                    <td className="px-4 py-4 text-slate-600">{item.price}</td>
+                                                    <td className="px-4 py-4 font-semibold text-slate-900 text-right">{item.total}</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            {/* Total */}
+                            <div className="flex justify-end mb-8">
+                                <div className="bg-blue-50 border border-blue-100 rounded-xl px-6 py-4">
+                                    <div className="text-sm text-blue-600 font-medium mb-1">Total Estimated Cost</div>
+                                    <div className="text-2xl font-bold text-slate-900">{totalCost}</div>
+                                </div>
+                            </div>
+
+                            {/* Actions */}
+                            <div className="flex gap-4">
+                                <Button
+                                    onClick={generatePDF}
+                                    className="flex-1 h-14 text-base font-semibold rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-lg shadow-blue-500/25 btn-shine"
+                                >
+                                    <Download className="w-5 h-5 mr-2" />
+                                    Download PDF
+                                </Button>
+                                <Link href="/" className="flex-1">
+                                    <Button
+                                        variant="outline"
+                                        className="w-full h-14 text-base font-semibold rounded-xl border-2 border-slate-200 hover:bg-slate-50"
+                                    >
+                                        New Quote
+                                    </Button>
+                                </Link>
+                            </div>
+                        </div>
+                    </Card>
+
+                    {/* Disclaimer */}
+                    <p className="text-center text-slate-400 text-sm mt-6">
+                        This is an AI-generated estimate. Final pricing may vary based on actual requirements.
+                    </p>
+                </div>
             </div>
         </div>
     );
@@ -114,8 +313,12 @@ function EstimateContent() {
 
 export default function EstimatePage() {
     return (
-        <Suspense fallback={<div>Loading estimate...</div>}>
+        <Suspense fallback={
+            <div className="min-h-screen bg-gradient-subtle flex items-center justify-center">
+                <div className="animate-pulse text-slate-400">Loading estimate...</div>
+            </div>
+        }>
             <EstimateContent />
         </Suspense>
-    )
+    );
 }
