@@ -184,15 +184,22 @@ Respond with valid JSON:
 
         const selectedModel = model || DEFAULT_MODEL;
 
-        const completion = await client.chat.completions.create({
+        // Reasoning models (o*) do not support temperature
+        const isReasoningModel = selectedModel.startsWith("o");
+        const params: any = {
             model: selectedModel,
             messages: [
                 { role: "system", content: systemPrompt },
                 { role: "user", content: "Based on the conversation history, what is the next step? Either ask another relevant question or generate the final quote if you have enough information." },
             ],
             response_format: { type: "json_object" },
-            temperature: 0.7,
-        });
+        };
+
+        if (!isReasoningModel) {
+            params.temperature = 0.7;
+        }
+
+        const completion = await client.chat.completions.create(params);
 
         const content = completion.choices[0].message.content;
         if (!content) {
