@@ -10,7 +10,7 @@ import { Home, Building2, Factory, Loader2, Settings, ArrowLeft, Sparkles, Check
 import { cn } from "@/lib/utils";
 import { getNextStep, type StepResponse, type NextStep } from "@/lib/openai-client";
 
-const MAX_STEPS = 5;
+const MAX_STEPS = 10;
 
 const projectTypes = [
     { id: "residential", name: "Residential", description: "Homes & apartments", icon: Home, color: "from-orange-500 to-amber-500" },
@@ -39,6 +39,14 @@ function OnboardingContent() {
         return undefined;
     };
 
+    // Get selected model from localStorage
+    const getModel = (): string | undefined => {
+        if (typeof window !== "undefined") {
+            return localStorage.getItem("openai_model") || undefined;
+        }
+        return undefined;
+    };
+
     // Initial load or transition from Category Selection
     useEffect(() => {
         if (category && history.length === 0 && !currentStepData && !needsApiKey) {
@@ -53,7 +61,8 @@ function OnboardingContent() {
 
         try {
             const apiKey = getApiKey();
-            const response = await getNextStep(history, category, apiKey);
+            const model = getModel();
+            const response = await getNextStep(history, category, apiKey, model);
 
             if (!response.success) {
                 if (response.error === "NO_API_KEY") {
@@ -98,7 +107,8 @@ function OnboardingContent() {
             setApiError(false);
 
             const apiKey = getApiKey();
-            getNextStep(newHistory, category!, apiKey).then((response) => {
+            const model = getModel();
+            getNextStep(newHistory, category!, apiKey, model).then((response) => {
                 if (!response.success) {
                     if (response.error === "NO_API_KEY") {
                         setNeedsApiKey(true);

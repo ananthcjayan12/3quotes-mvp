@@ -56,7 +56,7 @@ export default function LandingPage() {
         <section className="flex flex-col items-center justify-center pt-16 md:pt-24 pb-12 animate-fade-in">
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-blue-50 border border-blue-100 text-blue-700 text-sm font-medium mb-6">
             <Sparkles className="w-4 h-4" />
-            <span>AI-Powered Quotations</span>
+            <span>Powered by GPT-5 & o3 Reasoning</span>
           </div>
 
           <h1 className="text-4xl md:text-6xl font-bold text-center mb-6 tracking-tight leading-tight">
