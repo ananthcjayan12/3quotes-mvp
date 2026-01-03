@@ -8,8 +8,7 @@ import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Home, Building2, Factory, Loader2, Settings, ArrowLeft, Sparkles, CheckCircle2, Key, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { getNextStep, type StepResponse } from "@/app/actions";
-import type { NextStep } from "@/lib/openai";
+import { getNextStep, type StepResponse, type NextStep } from "@/lib/openai-client";
 
 const MAX_STEPS = 5;
 
