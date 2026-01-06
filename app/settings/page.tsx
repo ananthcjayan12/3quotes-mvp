@@ -4,12 +4,15 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { ArrowLeft, Key, Save, Check, AlertCircle, ExternalLink, Shield, Sparkles, Cpu, ChevronDown } from "lucide-react";
+import { ArrowLeft, Key, Save, Check, AlertCircle, ExternalLink, Shield, Sparkles, Cpu, ChevronDown, MessageSquare } from "lucide-react";
 import { AVAILABLE_MODELS, DEFAULT_MODEL } from "@/lib/openai-client";
+
+export const DEFAULT_MAX_QUESTIONS = 10;
 
 export default function SettingsPage() {
     const [apiKey, setApiKey] = useState("");
     const [selectedModel, setSelectedModel] = useState(DEFAULT_MODEL);
+    const [maxQuestions, setMaxQuestions] = useState(DEFAULT_MAX_QUESTIONS);
     const [saved, setSaved] = useState(false);
     const [error, setError] = useState("");
     const [hasKey, setHasKey] = useState(false);
@@ -17,6 +20,7 @@ export default function SettingsPage() {
     useEffect(() => {
         const savedKey = localStorage.getItem("openai_api_key");
         const savedModel = localStorage.getItem("openai_model");
+        const savedMaxQuestions = localStorage.getItem("max_questions");
 
         if (savedKey) {
             setApiKey(savedKey);
@@ -24,6 +28,9 @@ export default function SettingsPage() {
         }
         if (savedModel) {
             setSelectedModel(savedModel);
+        }
+        if (savedMaxQuestions) {
+            setMaxQuestions(parseInt(savedMaxQuestions, 10));
         }
     }, []);
 
@@ -40,6 +47,7 @@ export default function SettingsPage() {
 
         localStorage.setItem("openai_api_key", apiKey);
         localStorage.setItem("openai_model", selectedModel);
+        localStorage.setItem("max_questions", maxQuestions.toString());
         setSaved(true);
         setHasKey(true);
         setError("");
@@ -50,8 +58,10 @@ export default function SettingsPage() {
     const handleClear = () => {
         localStorage.removeItem("openai_api_key");
         localStorage.removeItem("openai_model");
+        localStorage.removeItem("max_questions");
         setApiKey("");
         setSelectedModel(DEFAULT_MODEL);
+        setMaxQuestions(DEFAULT_MAX_QUESTIONS);
         setHasKey(false);
     };
 
@@ -188,12 +198,12 @@ export default function SettingsPage() {
                                                 {model.name}
                                             </span>
                                             <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${model.category === "Recommended"
-                                                    ? "bg-green-100 text-green-700"
-                                                    : model.category === "Reasoning"
-                                                        ? "bg-blue-100 text-blue-700"
-                                                        : model.category === "Fast"
-                                                            ? "bg-amber-100 text-amber-700"
-                                                            : "bg-slate-100 text-slate-600"
+                                                ? "bg-green-100 text-green-700"
+                                                : model.category === "Reasoning"
+                                                    ? "bg-blue-100 text-blue-700"
+                                                    : model.category === "Fast"
+                                                        ? "bg-amber-100 text-amber-700"
+                                                        : "bg-slate-100 text-slate-600"
                                                 }`}>
                                                 {model.category}
                                             </span>
@@ -206,6 +216,45 @@ export default function SettingsPage() {
                                 </div>
                             </button>
                         ))}
+                    </div>
+                </Card>
+
+                {/* Max Questions Section */}
+                <Card className="p-6 md:p-8 border-0 shadow-xl bg-white/90 backdrop-blur-sm mb-6">
+                    <div className="flex items-start gap-4 mb-6">
+                        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center flex-shrink-0">
+                            <MessageSquare className="w-6 h-6 text-white" />
+                        </div>
+                        <div>
+                            <h2 className="text-xl font-bold text-slate-900 mb-1">Question Depth</h2>
+                            <p className="text-slate-500">Set the maximum number of questions before generating RFQ</p>
+                        </div>
+                    </div>
+
+                    <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                            <span className="text-sm text-slate-600">Maximum Questions</span>
+                            <span className="text-2xl font-bold text-amber-600">{maxQuestions}</span>
+                        </div>
+
+                        <input
+                            type="range"
+                            min="5"
+                            max="15"
+                            value={maxQuestions}
+                            onChange={(e) => setMaxQuestions(parseInt(e.target.value, 10))}
+                            className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-amber-500"
+                        />
+
+                        <div className="flex justify-between text-xs text-slate-400">
+                            <span>5 (Quick)</span>
+                            <span>10 (Balanced)</span>
+                            <span>15 (Detailed)</span>
+                        </div>
+
+                        <p className="text-sm text-slate-500 bg-slate-50 p-3 rounded-lg border border-slate-100">
+                            More questions = more detailed RFQ, but takes longer.
+                        </p>
                     </div>
                 </Card>
 

@@ -8,7 +8,7 @@ import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Home, Building2, Factory, Loader2, Settings, ArrowLeft, Sparkles, CheckCircle2, Key, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { getNextStep, type StepResponse, type NextStep } from "@/lib/openai-client";
+import { getNextStep, generateAuditedRFQ, type StepResponse, type NextStep } from "@/lib/openai-client";
 
 const MAX_STEPS = 10;
 
@@ -47,6 +47,15 @@ function OnboardingContent() {
         return undefined;
     };
 
+    // Get max questions setting from localStorage
+    const getMaxQuestions = (): number => {
+        if (typeof window !== "undefined") {
+            const stored = localStorage.getItem("max_questions");
+            return stored ? parseInt(stored, 10) : 10;
+        }
+        return 10;
+    };
+
     // Initial load or transition from Category Selection
     useEffect(() => {
         if (category && history.length === 0 && !currentStepData && !needsApiKey) {
@@ -62,7 +71,8 @@ function OnboardingContent() {
         try {
             const apiKey = getApiKey();
             const model = getModel();
-            const response = await getNextStep(history, category, apiKey, model);
+            const maxQuestions = getMaxQuestions();
+            const response = await getNextStep(history, category, apiKey, model, maxQuestions);
 
             if (!response.success) {
                 if (response.error === "NO_API_KEY") {
@@ -74,10 +84,19 @@ function OnboardingContent() {
                 return;
             }
 
+
             const step = response.data;
-            if (step.type === "quote" && step.quote) {
-                const quoteString = encodeURIComponent(JSON.stringify(step.quote));
-                router.push(`/estimate?data=${quoteString}`);
+            if (step.type === "rfq") {
+                // Use the Auditor Agent for validated RFQ generation
+                console.log("🔍 Starting audited RFQ generation...");
+                const auditedResponse = await generateAuditedRFQ(history, category, apiKey!, model, maxQuestions);
+
+                if (auditedResponse.success) {
+                    const rfqString = encodeURIComponent(JSON.stringify(auditedResponse.data));
+                    router.push(`/estimate?data=${rfqString}`);
+                } else {
+                    setApiError(true);
+                }
             } else {
                 setCurrentStepData(step);
             }
@@ -108,7 +127,8 @@ function OnboardingContent() {
 
             const apiKey = getApiKey();
             const model = getModel();
-            getNextStep(newHistory, category!, apiKey, model).then((response) => {
+            const maxQuestions = getMaxQuestions();
+            getNextStep(newHistory, category!, apiKey, model, maxQuestions).then((response) => {
                 if (!response.success) {
                     if (response.error === "NO_API_KEY") {
                         setNeedsApiKey(true);
@@ -120,13 +140,26 @@ function OnboardingContent() {
                 }
 
                 const step = response.data;
-                if (step.type === "quote" && step.quote) {
-                    const quoteString = encodeURIComponent(JSON.stringify(step.quote));
-                    router.push(`/estimate?data=${quoteString}`);
+                if (step.type === "rfq") {
+                    // Use the Auditor Agent for validated RFQ generation
+                    console.log("🔍 Starting audited RFQ generation...");
+                    const apiKey = getApiKey();
+                    const model = getModel();
+                    const maxQuestions = getMaxQuestions();
+
+                    generateAuditedRFQ(newHistory, category!, apiKey!, model, maxQuestions).then((auditedResponse) => {
+                        if (auditedResponse.success) {
+                            const rfqString = encodeURIComponent(JSON.stringify(auditedResponse.data));
+                            router.push(`/estimate?data=${rfqString}`);
+                        } else {
+                            setApiError(true);
+                            setLoading(false);
+                        }
+                    });
                 } else {
                     setCurrentStepData(step);
+                    setLoading(false);
                 }
-                setLoading(false);
             });
         }
     };
